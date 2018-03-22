@@ -169,7 +169,7 @@ float Planner::previous_speed[NUM_AXIS],
 #ifdef XY_FREQUENCY_LIMIT
   // Old direction bits. Used for speed calculations
   unsigned char Planner::old_direction_bits = 0;
-  // Segment times (in µs). Used for speed calculations
+  // Segment times (in μs). Used for speed calculations
   uint32_t Planner::axis_segment_time_us[2][3] = { { MAX_FREQ_TIME_US + 1, 0, 0 }, { MAX_FREQ_TIME_US + 1, 0, 0 } };
 #endif
 
@@ -729,83 +729,6 @@ void Planner::check_axes_activity() {
 
 #endif // PLANNER_LEVELING
 
-#define AXIS_BACKLASH {0.00, 0.00, 0.35, 0}
-  
-#if defined(AXIS_BACKLASH)
-    #define SIGN(v) ((v < 0) ? -1.0 : 1.0)
-    #define AXIS_BACKLASH_CORRECTION \
-    { \
-      static const float backlash[NUM_AXIS] = AXIS_BACKLASH; \
-      static uint8_t last_direction_bits; \
-      static bool is_correction = false; \
-      if(!is_correction) { \
-    	  uint8_t changed_dir = last_direction_bits ^ dm; \
-    	  /* Ignore direction change if no steps are taken in that direction */ \
-          if(CORE_IS_XY){ \
-              if(da + db == 0) CBI(changed_dir, A_AXIS); \
-              if(CORESIGN(da - db) == 0) CBI(changed_dir, B_AXIS); \
-              if(dc == 0) CBI(changed_dir, Z_AXIS); \
-          } \
-          if(CORE_IS_XZ){ \
-              if(da + dc == 0) CBI(changed_dir, A_AXIS); \
-              if(db == 0) CBI(changed_dir, Y_AXIS); \
-              if(CORESIGN(da - dc) == 0) CBI(changed_dir, C_AXIS); \
-          } \
-          if(CORE_IS_YZ){ \
-              if(da == 0) CBI(changed_dir, X_AXIS); \
-              if(db + dc == 0) CBI(changed_dir, B_AXIS); \
-              if(CORESIGN(db - dc) == 0) CBI(changed_dir, C_AXIS); \
-          } \
-          else { \
-              if(da == 0) CBI(changed_dir, X_AXIS); \
-              if(db == 0) CBI(changed_dir, Y_AXIS); \
-              if(dc == 0) CBI(changed_dir, Z_AXIS); \
-          } \
-    	  if(de == 0) CBI(changed_dir, E_AXIS); \
-    	  last_direction_bits ^= changed_dir; \
-    	  /* When there is motion in an opposing direction, apply the backlash correction */ \
-    	  if(changed_dir) { \
-    		  long saved_position[NUM_AXIS] = { 0 }; \
-    		  COPY(saved_position, position); \
-              if(CORE_IS_XY){ \
-                  const long x_backlash = TEST(changed_dir, A_AXIS) ? backlash[A_AXIS] * axis_steps_per_mm[A_AXIS] * SIGN(da + db) : 0; \
-                  const long y_backlash = TEST(changed_dir, B_AXIS) ? backlash[B_AXIS] * axis_steps_per_mm[B_AXIS] * SIGN(CORESIGN(da - db)) : 0; \
-                  const long z_backlash = TEST(changed_dir, Z_AXIS) ? backlash[Z_AXIS] * axis_steps_per_mm[Z_AXIS] * SIGN(dc) : 0; \
-              } \
-              if(CORE_IS_XZ){ \
-                  const long x_backlash = TEST(changed_dir, A_AXIS) ? backlash[A_AXIS] * axis_steps_per_mm[A_AXIS] * SIGN(da + dc) : 0; \
-                  const long y_backlash = TEST(changed_dir, Y_AXIS) ? backlash[Y_AXIS] * axis_steps_per_mm[Y_AXIS] * SIGN(db) : 0; \
-                  const long z_backlash = TEST(changed_dir, C_AXIS) ? backlash[C_AXIS] * axis_steps_per_mm[C_AXIS] * SIGN(CORESIGN(da - dc)) : 0; \
-              } \
-              if(CORE_IS_YZ){ \
-                  const long x_backlash = TEST(changed_dir, X_AXIS) ? backlash[X_AXIS] * axis_steps_per_mm[X_AXIS] * SIGN(da) : 0; \
-                  const long y_backlash = TEST(changed_dir, B_AXIS) ? backlash[B_AXIS] * axis_steps_per_mm[B_AXIS] * SIGN(db + dc) : 0; \
-                  const long z_backlash = TEST(changed_dir, C_AXIS) ? backlash[C_AXIS] * axis_steps_per_mm[C_AXIS] * SIGN(CORESIGN(db - dc)) : 0; \
-              } \
-              else { \
-                  const long x_backlash = TEST(changed_dir, X_AXIS) ? backlash[X_AXIS] * axis_steps_per_mm[X_AXIS] * SIGN(da) : 0; \
-                  const long y_backlash = TEST(changed_dir, Y_AXIS) ? backlash[Y_AXIS] * axis_steps_per_mm[Y_AXIS] * SIGN(db) : 0; \
-                  const long z_backlash = TEST(changed_dir, Z_AXIS) ? backlash[Z_AXIS] * axis_steps_per_mm[Z_AXIS] * SIGN(dc) : 0; \
-              } \
-    		  const long e_backlash = TEST(changed_dir, E_AXIS) ? backlash[E_AXIS] * axis_steps_per_mm[E_AXIS] * SIGN(de) : 0; \
-    		  is_correction = true; /* Avoid infinite recursion */ \
-    		  _buffer_line( \
-    			  (position[X_AXIS] + x_backlash)/axis_steps_per_mm[X_AXIS], \
-    			  (position[Y_AXIS] + y_backlash)/axis_steps_per_mm[Y_AXIS], \
-    			  (position[Z_AXIS] + z_backlash)/axis_steps_per_mm[Z_AXIS], \
-    			  (position[E_AXIS] + e_backlash)/axis_steps_per_mm[E_AXIS_N], \
-    			  fr_mm_s, extruder \
-    		  ); \
-    		  is_correction = false; \
-    		  COPY(position, saved_position); \
-    	  } \
-      } \
-    }
-#else
-    #define AXIS_BACKLASH_CORRECTION
-#endif
-
-
 /**
  * Planner::_buffer_steps
  *
@@ -895,7 +818,69 @@ void Planner::_buffer_steps(const int32_t (&target)[XYZE]
   #endif
   if (de < 0) SBI(dm, E_AXIS);
 
-  AXIS_BACKLASH_CORRECTION //kbulls axis backlash correction
+#if defined(AXIS_BACKLASH)
+#define SIGN(v) ((v < 0) ? -1.0 : 1.0)
+
+  static const float backlash[NUM_AXIS] = AXIS_BACKLASH;
+  static uint8_t last_direction_bits;
+  static bool is_correction = false;
+  if(!is_correction) {
+	  uint8_t changed_dir = last_direction_bits ^ dm;
+	  /* Ignore direction change if no steps are taken in that direction */
+#if CORE_IS_XY
+      if(da + db == 0) CBI(changed_dir, A_AXIS);
+      if(CORESIGN(da - db) == 0) CBI(changed_dir, B_AXIS);
+      if(dc == 0) CBI(changed_dir, Z_AXIS);
+#elif CORE_IS_XZ
+      if(da + dc == 0) CBI(changed_dir, A_AXIS);
+      if(db == 0) CBI(changed_dir, Y_AXIS);
+      if(CORESIGN(da - dc) == 0) CBI(changed_dir, C_AXIS);
+#elif CORE_IS_YZ
+      if(da == 0) CBI(changed_dir, X_AXIS);
+      if(db + dc == 0) CBI(changed_dir, B_AXIS);
+      if(CORESIGN(db - dc) == 0) CBI(changed_dir, C_AXIS);
+#else
+      if(da == 0) CBI(changed_dir, X_AXIS);
+      if(db == 0) CBI(changed_dir, Y_AXIS);
+      if(dc == 0) CBI(changed_dir, Z_AXIS);
+#endif
+	  if(de == 0) CBI(changed_dir, E_AXIS);
+	  last_direction_bits ^= changed_dir;
+	  /* When there is motion in an opposing direction, apply the backlash correction */
+	  if(changed_dir) {
+		  long saved_position[NUM_AXIS] = { 0 };
+		  COPY(saved_position, position);
+#if CORE_IS_XY
+          const long x_backlash = TEST(changed_dir, A_AXIS) ? backlash[A_AXIS] * axis_steps_per_mm[A_AXIS] * SIGN(da + db) : 0;
+          const long y_backlash = TEST(changed_dir, B_AXIS) ? backlash[B_AXIS] * axis_steps_per_mm[B_AXIS] * SIGN(CORESIGN(da - db)) : 0;
+          const long z_backlash = TEST(changed_dir, Z_AXIS) ? backlash[Z_AXIS] * axis_steps_per_mm[Z_AXIS] * SIGN(dc) : 0;
+#elif CORE_IS_XZ
+          const long x_backlash = TEST(changed_dir, A_AXIS) ? backlash[A_AXIS] * axis_steps_per_mm[A_AXIS] * SIGN(da + dc) : 0;
+          const long y_backlash = TEST(changed_dir, Y_AXIS) ? backlash[Y_AXIS] * axis_steps_per_mm[Y_AXIS] * SIGN(db) : 0;
+          const long z_backlash = TEST(changed_dir, C_AXIS) ? backlash[C_AXIS] * axis_steps_per_mm[C_AXIS] * SIGN(CORESIGN(da - dc)) : 0;
+#elif CORE_IS_YZ
+          const long x_backlash = TEST(changed_dir, X_AXIS) ? backlash[X_AXIS] * axis_steps_per_mm[X_AXIS] * SIGN(da) : 0;
+          const long y_backlash = TEST(changed_dir, B_AXIS) ? backlash[B_AXIS] * axis_steps_per_mm[B_AXIS] * SIGN(db + dc) : 0;
+          const long z_backlash = TEST(changed_dir, C_AXIS) ? backlash[C_AXIS] * axis_steps_per_mm[C_AXIS] * SIGN(CORESIGN(db - dc)) : 0;
+#else
+          const long x_backlash = TEST(changed_dir, X_AXIS) ? backlash[X_AXIS] * axis_steps_per_mm[X_AXIS] * SIGN(da) : 0;
+          const long y_backlash = TEST(changed_dir, Y_AXIS) ? backlash[Y_AXIS] * axis_steps_per_mm[Y_AXIS] * SIGN(db) : 0;
+          const long z_backlash = TEST(changed_dir, Z_AXIS) ? backlash[Z_AXIS] * axis_steps_per_mm[Z_AXIS] * SIGN(dc) : 0;
+#endif
+		  const long e_backlash = TEST(changed_dir, E_AXIS) ? backlash[E_AXIS] * axis_steps_per_mm[E_AXIS] * SIGN(de) : 0;
+		  is_correction = true; /* Avoid infinite recursion */
+		  _buffer_line(
+			  (position[X_AXIS] + x_backlash)/axis_steps_per_mm[X_AXIS],
+			  (position[Y_AXIS] + y_backlash)/axis_steps_per_mm[Y_AXIS],
+			  (position[Z_AXIS] + z_backlash)/axis_steps_per_mm[Z_AXIS],
+			  (position[E_AXIS] + e_backlash)/axis_steps_per_mm[E_AXIS_N],
+			  fr_mm_s, extruder
+		  );
+		  is_correction = false;
+		  COPY(position, saved_position);
+	  }
+  }
+#endif
 
   const float esteps_float = de * e_factor[extruder];
   const int32_t esteps = abs(esteps_float) + 0.5;
@@ -1233,7 +1218,7 @@ void Planner::_buffer_steps(const int32_t (&target)[XYZE]
     if (cs > max_feedrate_mm_s[i]) NOMORE(speed_factor, max_feedrate_mm_s[i] / cs);
   }
 
-  // Max segment time in µs.
+  // Max segment time in μs.
   #ifdef XY_FREQUENCY_LIMIT
 
     // Check and limit the xy direction change frequency
@@ -1435,7 +1420,7 @@ void Planner::_buffer_steps(const int32_t (&target)[XYZE]
   #endif
 
   /**
-   * Adapted from Průša MKS firmware
+   * Adapted from Pr??a MKS firmware
    * https://github.com/prusa3d/Prusa-Firmware
    *
    * Start with a safe speed (from which the machine may halt to stop immediately).
